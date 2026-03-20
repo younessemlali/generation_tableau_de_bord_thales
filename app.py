@@ -434,24 +434,69 @@ with st.sidebar:
         st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Randstad_logo.svg/320px-Randstad_logo.svg.png", width=150)
     except: pass
     st.markdown("---")
-    st.markdown("### 📁 Upload des fichiers")
-    st.caption("Formats acceptés : `.xlsx` `.xls` `.csv`")
 
-    file_ri = st.file_uploader("Fichier Randstad Intérim",
-                                type=['xlsx','xls','csv'], key='ri',
-                                help="Fichier pivot RI — sans colonne Statut EdB")
-    file_exp = st.file_uploader("Fichier Expectra",
-                                 type=['xlsx','xls','csv'], key='exp',
-                                 help="Fichier pivot EXP — avec colonne Statut EdB")
+    # ── Mode de chargement ────────────────────────────────────────────
+    st.markdown("### 📂 Source des données")
+    mode = st.radio(
+        "",
+        ["⬆️ Upload manuel", "🔗 Fichiers GitHub"],
+        label_visibility='collapsed',
+        help="Upload : déposez vos fichiers directement\nGitHub : utilise les fichiers déposés dans le repo"
+    )
     st.markdown("---")
 
-    if file_ri or file_exp:
+    file_ri = file_exp = None
+    github_ri = github_exp = None
+
+    if mode == "⬆️ Upload manuel":
+        st.markdown("**Formats acceptés : `.xlsx` `.xls` `.csv`**")
+        file_ri = st.file_uploader("Fichier Randstad Intérim",
+                                    type=['xlsx','xls','csv'], key='ri',
+                                    help="Fichier pivot RI — sans colonne Statut EdB")
+        file_exp = st.file_uploader("Fichier Expectra",
+                                     type=['xlsx','xls','csv'], key='exp',
+                                     help="Fichier pivot EXP — avec colonne Statut EdB")
+
+    else:  # Mode GitHub
+        st.markdown("**Fichiers attendus dans le dossier `/data/` du repo GitHub**")
+        st.caption("Nommez vos fichiers :")
+        st.code("data/\n  randstad_interims.xlsx\n  expectra.xlsx", language=None)
+
+        # URL de base du repo GitHub (configurable dans .streamlit/secrets.toml)
+        try:
+            github_base = st.secrets.get("GITHUB_RAW_URL", "")
+        except Exception:
+            github_base = ""
+
+        if not github_base:
+            st.warning("⚙️ Configurez `GITHUB_RAW_URL` dans les secrets Streamlit.")
+            st.markdown("""
+            **Comment faire :**
+            1. Sur Streamlit Cloud → votre app → **Settings → Secrets**
+            2. Ajoutez :
+            ```toml
+            GITHUB_RAW_URL = "https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main"
+            ```
+            """)
+        else:
+            st.success(f"✅ Repo configuré")
+            # Noms de fichiers personnalisables
+            nom_ri  = st.text_input("Nom fichier RI",  value="randstad_interims.xlsx", key='nom_ri')
+            nom_exp = st.text_input("Nom fichier EXP", value="expectra.xlsx",          key='nom_exp')
+            github_ri  = f"{github_base.rstrip('/')}/data/{nom_ri}"
+            github_exp = f"{github_base.rstrip('/')}/data/{nom_exp}"
+
+    st.markdown("---")
+
+    if file_ri or file_exp or github_ri or github_exp:
         st.markdown("### 🔎 Vue fournisseur")
+        has_ri  = file_ri  is not None or github_ri  is not None
+        has_exp = file_exp is not None or github_exp is not None
         options_vue = []
-        if file_ri and file_exp: options_vue.append('🔀 Consolidé RI+EXP')
-        if file_ri:  options_vue.append('🏢 Randstad Intérim')
-        if file_exp: options_vue.append('📊 Expectra')
-        vue = st.radio("", options_vue, label_visibility='collapsed')
+        if has_ri and has_exp: options_vue.append('🔀 Consolidé RI+EXP')
+        if has_ri:  options_vue.append('🏢 Randstad Intérim')
+        if has_exp: options_vue.append('📊 Expectra')
+        vue = st.radio("", options_vue, label_visibility='collapsed') if options_vue else None
     else:
         vue = None
 
@@ -463,25 +508,25 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════
 st.title("📊 Thales — Besoins & Candidatures")
 
-if not file_ri and not file_exp:
-    st.info("👈 **Uploadez vos fichiers** dans la barre latérale pour commencer.")
+aucune_source = not file_ri and not file_exp and not github_ri and not github_exp
+if aucune_source:
+    st.info("👈 **Choisissez une source de données** dans la barre latérale.")
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("""
-        #### 📂 Fichiers attendus
+        #### ⬆️ Mode Upload
+        Déposez vos fichiers directement dans l'app.
         - **Randstad Intérim** : pivot RI (20 colonnes)
-        - **Expectra** : pivot EXP (21 colonnes, avec Statut EdB)
+        - **Expectra** : pivot EXP (21 colonnes)
         - **Formats** : `.xlsx` `.xls` `.csv`
-        - Upload 1 ou 2 fichiers au choix
         """)
     with c2:
         st.markdown("""
-        #### 🎯 Fonctionnalités
-        - KPIs & graphiques interactifs
-        - **Recherche** par site, SIRET, qualification, agence, division, semaine
-        - **Analyses** : taux de couverture, délais, tendances, qualifications en tension
-        - Comparaison RI vs EXP
-        - Export Excel
+        #### 🔗 Mode GitHub
+        Déposez vos fichiers dans le dossier `/data/`
+        de votre repo GitHub — le dashboard se met
+        à jour automatiquement sans action utilisateur.
+        Configurez `GITHUB_RAW_URL` dans les secrets.
         """)
     st.stop()
 
@@ -490,19 +535,75 @@ def charger_ri(f):  return load_edb(f, idx_edb_hint=None)
 @st.cache_data
 def charger_exp(f): return load_edb(f, idx_edb_hint=11)
 
+@st.cache_data(ttl=300)  # Cache 5 min pour GitHub
+def charger_depuis_github(url, idx_edb_hint=None):
+    """Charge un fichier depuis une URL GitHub raw."""
+    import urllib.request
+    import tempfile, os
+    try:
+        with urllib.request.urlopen(url) as response:
+            data = response.read()
+        # Détecter l'extension depuis l'URL
+        ext = url.split('.')[-1].lower()
+        # Créer un fichier temporaire
+        with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        # Créer un objet compatible avec load_edb
+        class GithubFile:
+            def __init__(self, path, name):
+                self.name = name
+                self._buf = io.BytesIO(open(path, 'rb').read())
+            def read(self): return self._buf.read()
+            def seek(self, n, w=0): return self._buf.seek(n, w)
+            def tell(self): return self._buf.tell()
+        gf = GithubFile(tmp_path, url.split('/')[-1])
+        result = load_edb(gf, idx_edb_hint=idx_edb_hint)
+        os.unlink(tmp_path)
+        return result
+    except Exception as e:
+        return None, str(e)
+
 df_ri = df_exp = df_conso = None
+
+# ── Chargement RI ─────────────────────────────────────────────────────
 if file_ri:
     try:
         df_ri = edb_to_df(charger_ri(file_ri), 'Randstad Intérim')
-        st.sidebar.success(f"✅ RI — {len(df_ri)} expressions")
+        st.sidebar.success(f"✅ RI (upload) — {len(df_ri)} expressions")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur RI : {e}")
+elif github_ri:
+    with st.sidebar:
+        with st.spinner("Chargement RI depuis GitHub..."):
+            result = charger_depuis_github(github_ri, idx_edb_hint=None)
+            if isinstance(result, tuple):
+                st.error(f"❌ RI GitHub : {result[1]}")
+            elif result:
+                df_ri = edb_to_df(result, 'Randstad Intérim')
+                st.success(f"✅ RI (GitHub) — {len(df_ri)} expressions")
+            else:
+                st.warning("⚠️ Fichier RI non trouvé sur GitHub")
+
+# ── Chargement EXP ────────────────────────────────────────────────────
 if file_exp:
     try:
         df_exp = edb_to_df(charger_exp(file_exp), 'Expectra')
-        st.sidebar.success(f"✅ EXP — {len(df_exp)} expressions")
+        st.sidebar.success(f"✅ EXP (upload) — {len(df_exp)} expressions")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur EXP : {e}")
+elif github_exp:
+    with st.sidebar:
+        with st.spinner("Chargement EXP depuis GitHub..."):
+            result = charger_depuis_github(github_exp, idx_edb_hint=11)
+            if isinstance(result, tuple):
+                st.error(f"❌ EXP GitHub : {result[1]}")
+            elif result:
+                df_exp = edb_to_df(result, 'Expectra')
+                st.success(f"✅ EXP (GitHub) — {len(df_exp)} expressions")
+            else:
+                st.warning("⚠️ Fichier EXP non trouvé sur GitHub")
+
 if df_ri is not None and df_exp is not None:
     df_conso = consolider(df_ri, df_exp)
 
@@ -599,12 +700,53 @@ with tab_rech:
                 placeholder="N° expression, qualification, site...",
                 help="Recherche dans tous les champs texte")
         with r1c2:
-            q_siret = st.text_input("🏢 SIRET",
-                placeholder="ex: 41472510100086")
-        with r1c3:
             q_sem_range = st.text_input("📅 Semaine(s)",
                 placeholder="ex: 06 2026 ou 06 2026 - 10 2026",
                 help="Une semaine ou une plage")
+        with r1c3:
+            pass  # espaceur
+
+        # Ligne SIRET : liste déroulante + saisie libre côte à côte
+        st.markdown("**🏢 Recherche par SIRET**")
+        s1, s2, s3 = st.columns([2, 2, 2])
+        with s1:
+            # Liste déroulante des SIRET connus
+            sirets_connus = sorted(
+                [s for s in df_actif['siret'].dropna().unique() if s.strip() and s != 'None'],
+                key=lambda x: x
+            )
+            # Enrichir avec le nom du site pour faciliter la lecture
+            siret_to_site = df_actif.drop_duplicates('siret').set_index('siret')['site'].to_dict()
+            siret_labels = ['Tous'] + [
+                f"{s}  —  {siret_to_site.get(s, '')[:30]}" for s in sirets_connus
+            ]
+            siret_vals = [''] + sirets_connus
+            siret_idx = st.selectbox(
+                "Sélectionner un SIRET",
+                range(len(siret_labels)),
+                format_func=lambda i: siret_labels[i],
+                key='siret_select'
+            )
+            q_siret_select = siret_vals[siret_idx]
+        with s2:
+            q_siret_libre = st.text_input(
+                "Ou saisir librement",
+                placeholder="ex: 41472510100086",
+                help="Saisie partielle acceptée",
+                key='siret_libre'
+            )
+        with s3:
+            if q_siret_select:
+                st.info(f"📌 Site : **{siret_to_site.get(q_siret_select, '—')}**")
+            elif q_siret_libre.strip():
+                # Trouver le site correspondant
+                match = df_actif[df_actif['siret'].astype(str).str.contains(q_siret_libre.strip(), na=False)]
+                if not match.empty:
+                    sites_trouves = match['site'].dropna().unique()
+                    st.info(f"📌 Site(s) : **{', '.join(sites_trouves[:3])}**")
+
+        # SIRET actif = liste OU saisie libre (priorité à la liste si les deux sont remplis)
+        q_siret_actif = q_siret_select if q_siret_select else q_siret_libre.strip()
 
         r2c1, r2c2, r2c3, r2c4 = st.columns(4)
         with r2c1:
@@ -630,8 +772,13 @@ with tab_rech:
                 mask = mask | df_r[col].astype(str).str.contains(q_texte.strip(), case=False, na=False)
         df_r = df_r[mask]
 
-    if q_siret.strip():
-        df_r = df_r[df_r['siret'].astype(str).str.contains(q_siret.strip(), na=False)]
+    if q_siret_actif:
+        if q_siret_select:
+            # Correspondance exacte si sélection depuis la liste
+            df_r = df_r[df_r['siret'].astype(str) == q_siret_actif]
+        else:
+            # Correspondance partielle si saisie libre
+            df_r = df_r[df_r['siret'].astype(str).str.contains(q_siret_actif, na=False)]
 
     if q_sem_range.strip():
         parts = [p.strip() for p in q_sem_range.split('-') if p.strip()]
