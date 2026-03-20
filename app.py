@@ -443,8 +443,8 @@ with st.sidebar:
 
     github_ri = github_exp = None
     if github_base:
-        github_ri  = f"{github_base.rstrip('/')}/data/Besoins%20Thales%20RI%202026%20pivot.xlsx"
-        github_exp = f"{github_base.rstrip('/')}/data/Besoin_Candidature%20Thales%20Exp%20pivot.xlsx"
+        github_ri  = f"{github_base.rstrip('/')}/data/randstad_interims.xlsx"
+        github_exp = f"{github_base.rstrip('/')}/data/expectra.xlsx"
 
     # ── Upload manuel (toujours disponible, prioritaire sur GitHub) ───
     st.markdown("### 📁 Upload fichiers")
