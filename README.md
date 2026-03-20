@@ -1,6 +1,8 @@
 # 📊 Thales — Besoins & Candidatures Dashboard
 
-Application Streamlit pour analyser les fichiers pivot Thales (Randstad Intérim et/ou Expectra).
+Application Streamlit d'analyse des fichiers pivot PIXID (Randstad Intérim et/ou Expectra).
+
+---
 
 ## 🚀 Déploiement sur Streamlit Cloud
 
@@ -8,46 +10,92 @@ Application Streamlit pour analyser les fichiers pivot Thales (Randstad Intérim
 2. Aller sur [share.streamlit.io](https://share.streamlit.io)
 3. Connecter votre compte GitHub
 4. Sélectionner ce repo → branch `main` → fichier `app.py`
-5. Cliquer **Deploy** — en ligne en ~2 minutes
+5. Cliquer **Deploy**
 
-## 📁 Fichiers acceptés
+---
 
-| Format | Extension | Notes |
+## 📂 Structure du repo
+
+```
+votre-repo/
+├── app.py                  ← Application principale
+├── requirements.txt        ← Dépendances Python
+├── README.md
+├── .streamlit/
+│   ├── config.toml         ← Thème et configuration
+│   └── secrets.toml        ← (à créer localement, NE PAS committer)
+└── data/                   ← Dépôt des fichiers PIXID (mode GitHub)
+    ├── randstad_interims.xlsx
+    └── expectra.xlsx
+```
+
+---
+
+## 🔗 Mode GitHub (recommandé pour usage régulier)
+
+Déposez vos fichiers dans le dossier `/data/` du repo.
+L'application les charge automatiquement — aucun upload nécessaire.
+
+### Configuration requise
+
+Sur **Streamlit Cloud** → votre app → **Settings → Secrets**, ajoutez :
+
+```toml
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main"
+```
+
+Puis déposez vos fichiers dans `/data/` :
+- `data/randstad_interims.xlsx` → données Randstad Intérim
+- `data/expectra.xlsx` → données Expectra
+
+Le dashboard se met à jour automatiquement à chaque nouveau dépôt.
+
+### Pour un repo privé
+
+Ajoutez également votre token GitHub dans les secrets :
+```toml
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main"
+GITHUB_TOKEN = "ghp_votre_token_ici"
+```
+
+---
+
+## ⬆️ Mode Upload (usage ponctuel)
+
+Sélectionnez "Upload manuel" dans la sidebar et déposez vos fichiers directement.
+
+**Formats acceptés** : `.xlsx` `.xls` `.csv`
+
+---
+
+## 📁 Fichiers PIXID attendus
+
+| Fichier | Fournisseur | Colonnes clés |
 |---|---|---|
-| Excel moderne | `.xlsx` | Format recommandé |
-| Excel ancien | `.xls` | Compatible |
-| CSV | `.csv` | Séparateur `,` ou `;` détecté automatiquement, encodages UTF-8 / Latin-1 supportés |
+| Randstad Intérim | RI | 20 colonnes (sans Statut EdB) |
+| Expectra | EXP | 21 colonnes (avec Statut EdB) |
 
-| Fichier | Description |
-|---|---|
-| Randstad Intérim | Fichier pivot RI — 20 colonnes (sans Statut EdB) |
-| Expectra | Fichier pivot EXP — 21 colonnes (avec Statut EdB) |
+---
 
 ## 🎯 Fonctionnalités
 
-- ✅ Upload de 1 ou 2 fichiers (RI seul, EXP seul, ou les deux)
-- ✅ Vue par fournisseur : Randstad Intérim / Expectra / Consolidé RI+EXP
-- ✅ Filtres dynamiques : site Thales, semaine de diffusion, statut EdB
-- ✅ KPIs colorés par catégorie
-- ✅ Graphiques interactifs : barres par semaine, camembert, top sites
-- ✅ Comparaison RI vs EXP côte à côte
-- ✅ Tableau des expressions critiques
-- ✅ Export Excel téléchargeable
+- **2 modes** : Upload manuel ou chargement depuis GitHub
+- **3 vues** : Randstad Intérim / Expectra / Consolidé RI+EXP
+- **4 onglets** : Tableau de Bord, Recherche, Analyses & Statistiques, Actions Requises
+- **Recherche** : site, SIRET (liste + saisie libre), qualification, division, semaine, situation
+- **6 analyses** : taux couverture, délais, tendance, qualifications en tension, RI vs EXP, stats par site
+- **Export Excel** téléchargeable
 
-## 🏗️ Structure
-
-```
-thales_dashboard/
-├── app.py              # Application principale
-├── requirements.txt    # Dépendances Python
-├── .streamlit/
-│   └── config.toml     # Thème et configuration
-└── README.md
-```
+---
 
 ## ⚙️ Lancer en local
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
+```
+
+Pour le mode GitHub en local, créez `.streamlit/secrets.toml` :
+```toml
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main"
 ```
