@@ -7,26 +7,32 @@ Application Streamlit pour analyser les fichiers pivot Thales (Randstad Intérim
 1. **Forker** ce repository sur GitHub
 2. Aller sur [share.streamlit.io](https://share.streamlit.io)
 3. Connecter votre compte GitHub
-4. Sélectionner ce repository, branch `main`, fichier `app.py`
-5. Cliquer **Deploy**
+4. Sélectionner ce repo → branch `main` → fichier `app.py`
+5. Cliquer **Deploy** — en ligne en ~2 minutes
 
-## 📁 Fichiers attendus
+## 📁 Fichiers acceptés
 
-| Fichier | Description | Colonnes clés |
+| Format | Extension | Notes |
 |---|---|---|
-| Randstad Intérim | Fichier pivot RI | 20 colonnes (sans Statut EdB) |
-| Expectra | Fichier pivot EXP | 21 colonnes (avec Statut EdB) |
+| Excel moderne | `.xlsx` | Format recommandé |
+| Excel ancien | `.xls` | Compatible |
+| CSV | `.csv` | Séparateur `,` ou `;` détecté automatiquement, encodages UTF-8 / Latin-1 supportés |
+
+| Fichier | Description |
+|---|---|
+| Randstad Intérim | Fichier pivot RI — 20 colonnes (sans Statut EdB) |
+| Expectra | Fichier pivot EXP — 21 colonnes (avec Statut EdB) |
 
 ## 🎯 Fonctionnalités
 
-- Upload d'un ou deux fichiers Excel
-- Vue par fournisseur (RI / EXP) ou consolidée
-- Filtres dynamiques : site, semaine, statut EdB
-- KPIs interactifs
-- Graphiques : barres par semaine, camembert, top sites
-- Comparaison RI vs EXP côte à côte
-- Tableau des expressions critiques
-- Export Excel téléchargeable
+- ✅ Upload de 1 ou 2 fichiers (RI seul, EXP seul, ou les deux)
+- ✅ Vue par fournisseur : Randstad Intérim / Expectra / Consolidé RI+EXP
+- ✅ Filtres dynamiques : site Thales, semaine de diffusion, statut EdB
+- ✅ KPIs colorés par catégorie
+- ✅ Graphiques interactifs : barres par semaine, camembert, top sites
+- ✅ Comparaison RI vs EXP côte à côte
+- ✅ Tableau des expressions critiques
+- ✅ Export Excel téléchargeable
 
 ## 🏗️ Structure
 
