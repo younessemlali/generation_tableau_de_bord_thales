@@ -435,63 +435,35 @@ with st.sidebar:
     except: pass
     st.markdown("---")
 
-    # ── Mode de chargement ────────────────────────────────────────────
-    st.markdown("### 📂 Source des données")
-    mode = st.radio(
-        "Source",
-        ["⬆️ Upload manuel", "🔗 Fichiers GitHub"],
-        label_visibility='collapsed',
-        help="Upload : déposez vos fichiers directement\nGitHub : utilise les fichiers déposés dans le repo"
-    )
-    st.markdown("---")
+    # ── GitHub : chargement automatique si configuré ──────────────────
+    try:
+        github_base = st.secrets.get("GITHUB_RAW_URL", "")
+    except Exception:
+        github_base = ""
 
-    file_ri = file_exp = None
     github_ri = github_exp = None
+    if github_base:
+        github_ri  = f"{github_base.rstrip('/')}/data/randstad_interims.xlsx"
+        github_exp = f"{github_base.rstrip('/')}/data/expectra.xlsx"
 
-    if mode == "⬆️ Upload manuel":
-        st.markdown("**Formats acceptés : `.xlsx` `.xls` `.csv`**")
-        file_ri = st.file_uploader("Fichier Randstad Intérim",
-                                    type=['xlsx','xls','csv'], key='ri',
-                                    help="Fichier pivot RI — sans colonne Statut EdB")
-        file_exp = st.file_uploader("Fichier Expectra",
-                                     type=['xlsx','xls','csv'], key='exp',
-                                     help="Fichier pivot EXP — avec colonne Statut EdB")
+    # ── Upload manuel (toujours disponible, prioritaire sur GitHub) ───
+    st.markdown("### 📁 Upload fichiers")
+    st.caption("Optionnel — remplace les fichiers GitHub si uploadé")
+    st.caption("Formats : `.xlsx` `.xls` `.csv`")
+    file_ri = st.file_uploader("Randstad Intérim",
+                                type=['xlsx','xls','csv'], key='ri',
+                                help="Upload pour remplacer le fichier GitHub RI")
+    file_exp = st.file_uploader("Expectra",
+                                 type=['xlsx','xls','csv'], key='exp',
+                                help="Upload pour remplacer le fichier GitHub EXP")
 
-    else:  # Mode GitHub
-        st.markdown("**Fichiers attendus dans le dossier `/data/` du repo GitHub**")
-        st.caption("Nommez vos fichiers :")
-        st.code("data/\n  randstad_interims.xlsx\n  expectra.xlsx", language=None)
+    # ── Vue fournisseur ───────────────────────────────────────────────
+    has_ri  = file_ri  is not None or github_ri  is not None
+    has_exp = file_exp is not None or github_exp is not None
 
-        # URL de base du repo GitHub (configurable dans .streamlit/secrets.toml)
-        try:
-            github_base = st.secrets.get("GITHUB_RAW_URL", "")
-        except Exception:
-            github_base = ""
-
-        if not github_base:
-            st.warning("⚙️ Configurez `GITHUB_RAW_URL` dans les secrets Streamlit.")
-            st.markdown("""
-            **Comment faire :**
-            1. Sur Streamlit Cloud → votre app → **Settings → Secrets**
-            2. Ajoutez :
-            ```toml
-            GITHUB_RAW_URL = "https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main"
-            ```
-            """)
-        else:
-            st.success(f"✅ Repo configuré")
-            # Noms de fichiers personnalisables
-            nom_ri  = st.text_input("Nom fichier RI",  value="randstad_interims.xlsx", key='nom_ri')
-            nom_exp = st.text_input("Nom fichier EXP", value="expectra.xlsx",          key='nom_exp')
-            github_ri  = f"{github_base.rstrip('/')}/data/{nom_ri}"
-            github_exp = f"{github_base.rstrip('/')}/data/{nom_exp}"
-
-    st.markdown("---")
-
-    if file_ri or file_exp or github_ri or github_exp:
+    if has_ri or has_exp:
+        st.markdown("---")
         st.markdown("### 🔎 Vue fournisseur")
-        has_ri  = file_ri  is not None or github_ri  is not None
-        has_exp = file_exp is not None or github_exp is not None
         options_vue = []
         if has_ri and has_exp: options_vue.append('🔀 Consolidé RI+EXP')
         if has_ri:  options_vue.append('🏢 Randstad Intérim')
