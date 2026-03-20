@@ -507,7 +507,6 @@ def charger_ri(f):  return load_edb(f, idx_edb_hint=None)
 @st.cache_data
 def charger_exp(f): return load_edb(f, idx_edb_hint=11)
 
-@st.cache_data(ttl=300)  # Cache 5 min pour GitHub
 def charger_depuis_github(url, idx_edb_hint=None):
     """Charge un fichier depuis une URL GitHub raw via requests."""
     import requests, tempfile, os
@@ -561,7 +560,7 @@ elif github_ri:
             result = charger_depuis_github(github_ri, idx_edb_hint=None)
             if isinstance(result, tuple):
                 st.error(f"❌ RI GitHub : {result[1]}")
-            elif result:
+            elif result is not None:
                 df_ri = edb_to_df(result, 'Randstad Intérim')
                 st.success(f"✅ RI (GitHub) — {len(df_ri)} expressions")
             else:
@@ -580,7 +579,7 @@ elif github_exp:
             result = charger_depuis_github(github_exp, idx_edb_hint=11)
             if isinstance(result, tuple):
                 st.error(f"❌ EXP GitHub : {result[1]}")
-            elif result:
+            elif result is not None:
                 df_exp = edb_to_df(result, 'Expectra')
                 st.success(f"✅ EXP (GitHub) — {len(df_exp)} expressions")
             else:
