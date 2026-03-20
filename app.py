@@ -438,7 +438,7 @@ with st.sidebar:
     # ── Mode de chargement ────────────────────────────────────────────
     st.markdown("### 📂 Source des données")
     mode = st.radio(
-        "",
+        "Source",
         ["⬆️ Upload manuel", "🔗 Fichiers GitHub"],
         label_visibility='collapsed',
         help="Upload : déposez vos fichiers directement\nGitHub : utilise les fichiers déposés dans le repo"
@@ -496,7 +496,7 @@ with st.sidebar:
         if has_ri and has_exp: options_vue.append('🔀 Consolidé RI+EXP')
         if has_ri:  options_vue.append('🏢 Randstad Intérim')
         if has_exp: options_vue.append('📊 Expectra')
-        vue = st.radio("", options_vue, label_visibility='collapsed') if options_vue else None
+        vue = st.radio("Vue fournisseur", options_vue, label_visibility='collapsed') if options_vue else None
     else:
         vue = None
 
@@ -616,8 +616,15 @@ elif df_conso is not None:
     df_actif, nom_vue, couleur, has_statut = df_conso, "Consolidé RI+EXP", "#1F3864", True
 elif df_ri is not None:
     df_actif, nom_vue, couleur, has_statut = df_ri, "Randstad Intérim", "#1F6B75", False
-else:
+elif df_exp is not None:
     df_actif, nom_vue, couleur, has_statut = df_exp, "Expectra", "#7030A0", True
+else:
+    df_actif = None
+    nom_vue = ""; couleur = "#1F3864"; has_statut = False
+
+if df_actif is None:
+    st.warning("⚠️ Aucune donnée chargée. Uploadez un fichier ou vérifiez la connexion GitHub.")
+    st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════
 # NAVIGATION PAR ONGLETS
