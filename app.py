@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import openpyxl
 from collections import defaultdict, Counter
 import io
-import r
+import re
 from datetime import date
 
 # ══════════════════════════════════════════════════════════════════════════
