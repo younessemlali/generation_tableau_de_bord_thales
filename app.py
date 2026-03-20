@@ -443,8 +443,8 @@ with st.sidebar:
 
     github_ri = github_exp = None
     if github_base:
-        github_ri  = f"{github_base.rstrip('/')}/data/randstad_interims.xlsx"
-        github_exp = f"{github_base.rstrip('/')}/data/expectra.xlsx"
+        github_ri  = f"{github_base.rstrip('/')}/data/Besoins%20Thales%20RI%202026%20pivot.xlsx"
+        github_exp = f"{github_base.rstrip('/')}/data/Besoin_Candidature%20Thales%20Exp%20pivot.xlsx"
 
     # ── Upload manuel (toujours disponible, prioritaire sur GitHub) ───
     st.markdown("### 📁 Upload fichiers")
@@ -509,19 +509,29 @@ def charger_exp(f): return load_edb(f, idx_edb_hint=11)
 
 @st.cache_data(ttl=300)  # Cache 5 min pour GitHub
 def charger_depuis_github(url, idx_edb_hint=None):
-    """Charge un fichier depuis une URL GitHub raw."""
-    import urllib.request
-    import tempfile, os
+    """Charge un fichier depuis une URL GitHub raw via requests."""
+    import requests, tempfile, os
     try:
-        with urllib.request.urlopen(url) as response:
-            data = response.read()
-        # Détecter l'extension depuis l'URL
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Streamlit)',
+            'Accept': 'application/octet-stream, */*',
+        }
+        # Ajouter le token GitHub si disponible dans les secrets
+        try:
+            token = st.secrets.get("GITHUB_TOKEN", "")
+            if token:
+                headers["Authorization"] = f"token {token}"
+        except Exception:
+            pass
+
+        r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code != 200:
+            return None, f"HTTP Error {r.status_code}: {r.reason}"
+        data = r.content
         ext = url.split('.')[-1].lower()
-        # Créer un fichier temporaire
         with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
-        # Créer un objet compatible avec load_edb
         class GithubFile:
             def __init__(self, path, name):
                 self.name = name
