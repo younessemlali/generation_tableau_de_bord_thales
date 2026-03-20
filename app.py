@@ -435,16 +435,13 @@ with st.sidebar:
     except: pass
     st.markdown("---")
 
-    # ── GitHub : chargement automatique si configuré ──────────────────
-    try:
-        github_base = st.secrets.get("GITHUB_RAW_URL", "")
-    except Exception:
-        github_base = ""
-
-    github_ri = github_exp = None
-    if github_base:
-        github_ri  = f"{github_base.rstrip('/')}/data/randstad_interims.xlsx"
-        github_exp = f"{github_base.rstrip('/')}/data/expectra.xlsx"
+    # ── Fichiers locaux (Streamlit Cloud clone le repo en local) ─────────
+    import os
+    _base = os.path.dirname(os.path.abspath(__file__))
+    path_ri  = os.path.join(_base, "data", "randstad_interims.xlsx")
+    path_exp = os.path.join(_base, "data", "expectra.xlsx")
+    auto_ri  = os.path.exists(path_ri)
+    auto_exp = os.path.exists(path_exp)
 
     # ── Upload manuel (toujours disponible, prioritaire sur GitHub) ───
     st.markdown("### 📁 Upload fichiers")
@@ -458,8 +455,8 @@ with st.sidebar:
                                 help="Upload pour remplacer le fichier GitHub EXP")
 
     # ── Vue fournisseur ───────────────────────────────────────────────
-    has_ri  = file_ri  is not None or github_ri  is not None
-    has_exp = file_exp is not None or github_exp is not None
+    has_ri  = file_ri is not None or auto_ri
+    has_exp = file_exp is not None or auto_exp
 
     if has_ri or has_exp:
         st.markdown("---")
@@ -480,7 +477,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════
 st.title("📊 Thales — Besoins & Candidatures")
 
-aucune_source = not file_ri and not file_exp and not github_ri and not github_exp
+aucune_source = not file_ri and not file_exp and not auto_ri and not auto_exp
 if aucune_source:
     st.info("👈 **Choisissez une source de données** dans la barre latérale.")
     c1, c2 = st.columns(2)
@@ -509,47 +506,26 @@ def charger_exp(f): return load_edb(f, idx_edb_hint=11)
 
 @st.cache_data(ttl=300)  # Cache 5 min pour GitHub
 def charger_depuis_github(url, idx_edb_hint=None):
-    """Charge un fichier depuis GitHub via plusieurs méthodes."""
-    import requests, tempfile, os, base64
-
-    nom_fichier = url.split('/')[-1]
-    ext = nom_fichier.split('.')[-1].lower()
-
-    def essayer_url(target_url, extra_headers=None):
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        if extra_headers:
-            headers.update(extra_headers)
+    """Charge un fichier depuis une URL GitHub raw via requests."""
+    import requests, tempfile, os
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Streamlit)',
+            'Accept': 'application/octet-stream, */*',
+        }
+        # Ajouter le token GitHub si disponible dans les secrets
         try:
             token = st.secrets.get("GITHUB_TOKEN", "")
             if token:
                 headers["Authorization"] = f"token {token}"
         except Exception:
             pass
-        r = requests.get(target_url, headers=headers, timeout=30)
-        return r
 
-    # Méthode 1 : raw.githubusercontent.com (URL directe)
-    try:
-        r = essayer_url(url)
-        if r.status_code == 200:
-            data = r.content
-        else:
-            # Méthode 2 : API GitHub (contourne les restrictions réseau)
-            # Convertir raw URL → API URL
-            # raw.githubusercontent.com/USER/REPO/BRANCH/PATH → api.github.com/repos/USER/REPO/contents/PATH
-            parts = url.replace("https://raw.githubusercontent.com/", "").split("/")
-            user, repo, branch = parts[0], parts[1], parts[2]
-            path = "/".join(parts[3:])
-            api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{path}?ref={branch}"
-            r2 = essayer_url(api_url, {'Accept': 'application/vnd.github.v3.raw'})
-            if r2.status_code == 200:
-                data = r2.content
-            else:
-                return None, f"HTTP {r.status_code} (raw) et {r2.status_code} (API)"
-    except Exception as e:
-        return None, str(e)
-
-    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code != 200:
+            return None, f"HTTP Error {r.status_code}: {r.reason}"
+        data = r.content
+        ext = url.split('.')[-1].lower()
         with tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False) as tmp:
             tmp.write(data)
             tmp_path = tmp.name
@@ -560,7 +536,7 @@ def charger_depuis_github(url, idx_edb_hint=None):
             def read(self): return self._buf.read()
             def seek(self, n, w=0): return self._buf.seek(n, w)
             def tell(self): return self._buf.tell()
-        gf = GithubFile(tmp_path, nom_fichier)
+        gf = GithubFile(tmp_path, url.split('/')[-1])
         result = load_edb(gf, idx_edb_hint=idx_edb_hint)
         os.unlink(tmp_path)
         return result
@@ -576,17 +552,19 @@ if file_ri:
         st.sidebar.success(f"✅ RI (upload) — {len(df_ri)} expressions")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur RI : {e}")
-elif github_ri:
-    with st.sidebar:
-        with st.spinner("Chargement RI depuis GitHub..."):
-            result = charger_depuis_github(github_ri, idx_edb_hint=None)
-            if isinstance(result, tuple):
-                st.error(f"❌ RI GitHub : {result[1]}")
-            elif result:
-                df_ri = edb_to_df(result, 'Randstad Intérim')
-                st.success(f"✅ RI (GitHub) — {len(df_ri)} expressions")
-            else:
-                st.warning("⚠️ Fichier RI non trouvé sur GitHub")
+elif auto_ri:
+    try:
+        _buf_ri = io.BytesIO(open(path_ri, "rb").read())
+        class _F_RI:
+            name = "randstad_interims.xlsx"
+            _b   = _buf_ri
+            def read(s): return s._b.read()
+            def seek(s,n,w=0): return s._b.seek(n,w)
+            def tell(s): return s._b.tell()
+        df_ri = edb_to_df(load_edb(_F_RI(), idx_edb_hint=None), "Randstad Intérim")
+        st.sidebar.success(f"✅ RI (auto) — {len(df_ri)} expressions")
+    except Exception as e:
+        st.sidebar.error(f"❌ Erreur RI local : {e}")
 
 # ── Chargement EXP ────────────────────────────────────────────────────
 if file_exp:
@@ -595,17 +573,19 @@ if file_exp:
         st.sidebar.success(f"✅ EXP (upload) — {len(df_exp)} expressions")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur EXP : {e}")
-elif github_exp:
-    with st.sidebar:
-        with st.spinner("Chargement EXP depuis GitHub..."):
-            result = charger_depuis_github(github_exp, idx_edb_hint=11)
-            if isinstance(result, tuple):
-                st.error(f"❌ EXP GitHub : {result[1]}")
-            elif result:
-                df_exp = edb_to_df(result, 'Expectra')
-                st.success(f"✅ EXP (GitHub) — {len(df_exp)} expressions")
-            else:
-                st.warning("⚠️ Fichier EXP non trouvé sur GitHub")
+elif auto_exp:
+    try:
+        _buf_exp = io.BytesIO(open(path_exp, "rb").read())
+        class _F_EXP:
+            name = "expectra.xlsx"
+            _b   = _buf_exp
+            def read(s): return s._b.read()
+            def seek(s,n,w=0): return s._b.seek(n,w)
+            def tell(s): return s._b.tell()
+        df_exp = edb_to_df(load_edb(_F_EXP(), idx_edb_hint=11), "Expectra")
+        st.sidebar.success(f"✅ EXP (auto) — {len(df_exp)} expressions")
+    except Exception as e:
+        st.sidebar.error(f"❌ Erreur EXP local : {e}")
 
 if df_ri is not None and df_exp is not None:
     df_conso = consolider(df_ri, df_exp)
